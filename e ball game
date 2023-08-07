@@ -1,0 +1,205 @@
+import pygame
+import random
+import math
+
+# Initialize Pygame
+pygame.init()
+
+# Game window dimensions
+WINDOW_WIDTH = 800
+WINDOW_HEIGHT = 600
+
+# Paddle dimensions
+PADDLE_WIDTH = 100
+PADDLE_HEIGHT = 10
+PADDLE_COLOR = (0, 255, 0)
+
+# Ball dimensions
+BALL_RADIUS = 10
+BALL_COLOR = (255, 255, 255)
+
+# Brick dimensions
+BRICK_WIDTH = 70
+BRICK_HEIGHT = 20
+BRICK_COLOR = (255, 0, 0)
+
+# Power-up dimensions
+POWERUP_SIZE = 20
+POWERUP_COLOR = (0, 0, 255)
+
+# Number of bricks
+NUM_BRICKS = 50
+
+# Initialize the game window
+window = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
+pygame.display.set_caption("Brick Bounce Game")
+
+clock = pygame.time.Clock()
+
+# Initialize the paddle
+paddle_x = (WINDOW_WIDTH - PADDLE_WIDTH) // 2
+paddle_y = WINDOW_HEIGHT - PADDLE_HEIGHT - 10
+
+# Initialize the ball
+ball_x = WINDOW_WIDTH // 2
+ball_y = paddle_y - BALL_RADIUS - 5
+
+ball_velocity_x = random.choice([-2, 2])
+ball_velocity_y = -2
+
+# Initialize the power-up
+powerup_x = random.randint(50, WINDOW_WIDTH - 50)
+powerup_y = random.randint(50, paddle_y - 50)
+powerup_active = False
+powerup_timer = 5000  # 5 seconds
+
+# Initialize bricks
+bricks = []
+for i in range(NUM_BRICKS):
+    brick_x = (i % 10) * (BRICK_WIDTH + 5) + 30
+    brick_y = (i // 10) * (BRICK_HEIGHT + 5) + 50
+    bricks.append(pygame.Rect(brick_x, brick_y, BRICK_WIDTH, BRICK_HEIGHT))
+
+# Game loop
+running = True
+lives = 3
+bricks_broken = 0
+
+# Variables for power-up black balls
+black_balls = []
+black_ball_speed = 3
+black_ball_radius = 5
+
+while running:
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+
+    keys = pygame.key.get_pressed()
+    if keys[pygame.K_LEFT] and paddle_x > 0:
+        paddle_x -= 5
+    if keys[pygame.K_RIGHT] and paddle_x < WINDOW_WIDTH - PADDLE_WIDTH:
+        paddle_x += 5
+
+    # Move the ball
+    ball_x += ball_velocity_x
+    ball_y += ball_velocity_y
+
+    # Check collision with paddle
+    if ball_y + BALL_RADIUS >= paddle_y and ball_y + BALL_RADIUS <= paddle_y + PADDLE_HEIGHT and ball_velocity_y > 0:
+        if ball_x + BALL_RADIUS >= paddle_x and ball_x - BALL_RADIUS <= paddle_x + PADDLE_WIDTH:
+            ball_velocity_y = -ball_velocity_y
+
+    # Check collision with bricks
+    for brick in bricks:
+        if pygame.Rect(ball_x - BALL_RADIUS, ball_y - BALL_RADIUS, BALL_RADIUS * 2, BALL_RADIUS * 2).colliderect(brick):
+            bricks.remove(brick)
+            ball_velocity_y = -ball_velocity_y
+            bricks_broken += 1
+
+            # Activate power-up
+            if random.random() < 0.1 and not powerup_active:
+                powerup_active = True
+                powerup_x = random.randint(50, WINDOW_WIDTH - 50)
+                powerup_y = random.randint(50, paddle_y - 50)
+                powerup_timer = 5000  # Reset the timer
+
+            break
+
+    # Check collision with window edges
+    if ball_x + BALL_RADIUS >= WINDOW_WIDTH or ball_x - BALL_RADIUS <= 0:
+        ball_velocity_x = -ball_velocity_x
+    if ball_y - BALL_RADIUS <= 0:
+        ball_velocity_y = -ball_velocity_y
+
+    # Check if ball missed the paddle
+    if ball_y + BALL_RADIUS >= WINDOW_HEIGHT:
+        lives -= 1
+        if lives == 0:
+            running = False
+        else:
+            ball_x = WINDOW_WIDTH // 2
+            ball_y = paddle_y - BALL_RADIUS - 5
+
+    # Update power-up position and timer
+    if powerup_active:
+        powerup_y += 1
+        powerup_timer -= clock.get_time()
+
+        # Check collision with paddle for power-up collection
+        powerup_rect = pygame.Rect(powerup_x, powerup_y, POWERUP_SIZE, POWERUP_SIZE)
+        if powerup_rect.colliderect(pygame.Rect(paddle_x, paddle_y, PADDLE_WIDTH, PADDLE_HEIGHT)):
+            powerup_active = False
+            # Shoot black balls
+            angle = math.radians(random.randint(30, 150))
+            black_balls.append([ball_x, ball_y, black_ball_speed * math.cos(angle), -black_ball_speed * math.sin(angle)])
+
+    # Update black balls
+    for black_ball in black_balls:
+        black_ball[0] += black_ball[2]
+        black_ball[1] += black_ball[3]
+
+        # Check collision with bricks
+        for brick in bricks:
+            if pygame.Rect(black_ball[0] - black_ball_radius, black_ball[1] - black_ball_radius,
+                           black_ball_radius * 2, black_ball_radius * 2).colliderect(brick):
+                bricks.remove(brick)
+                black_balls.remove(black_ball)
+                bricks_broken += 1
+                break
+
+        # Check collision with window edges
+        if black_ball[0] + black_ball_radius >= WINDOW_WIDTH or black_ball[0] - black_ball_radius <= 0:
+            black_ball[2] = -black_ball[2]
+        if black_ball[1] - black_ball_radius <= 0:
+            black_ball[3] = -black_ball[3]
+
+    # Spawn new power-up after timer ends
+    if not powerup_active and powerup_timer <= 0:
+        powerup_active = True
+        powerup_x = random.randint(50, WINDOW_WIDTH - 50)
+        powerup_y = random.randint(50, paddle_y - 50)
+        powerup_timer = 5000  # Reset the timer
+
+    # Clear the window
+    window.fill((0, 0, 0))
+
+    # Draw the paddle
+    pygame.draw.rect(window, PADDLE_COLOR, (paddle_x, paddle_y, PADDLE_WIDTH, PADDLE_HEIGHT))
+
+    # Draw the ball
+    pygame.draw.circle(window, BALL_COLOR, (ball_x, ball_y), BALL_RADIUS)
+
+    # Draw the bricks
+    for brick in bricks:
+        pygame.draw.rect(window, BRICK_COLOR, brick)
+
+    # Draw the power-up
+    if powerup_active:
+        pygame.draw.rect(window, POWERUP_COLOR, (powerup_x, powerup_y, POWERUP_SIZE, POWERUP_SIZE))
+
+    # Draw the black balls
+    for black_ball in black_balls:
+        pygame.draw.circle(window, (0, 0, 0), (int(black_ball[0]), int(black_ball[1])), black_ball_radius)
+
+    # Update the display
+    pygame.display.flip()
+
+    clock.tick(60)
+
+# Game over
+window.fill((0, 0, 0))
+font = pygame.font.Font(None, 36)
+if bricks_broken == NUM_BRICKS:
+    text = font.render("You Win!", True, (255, 255, 255))
+else:
+    text = font.render("Game Over", True, (255, 255, 255))
+text_rect = text.get_rect(center=(WINDOW_WIDTH // 2, WINDOW_HEIGHT // 2))
+window.blit(text, text_rect)
+pygame.display.flip()
+
+# Wait for a few seconds before closing the window
+pygame.time.wait(3000)
+
+# Quit the game
+pygame.quit()
