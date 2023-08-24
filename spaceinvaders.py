@@ -83,7 +83,7 @@ def game_over_text():
 running = True
 while running:
     # Clear the window
-    window.fill(BLACK)
+    window.fill(bLACK)
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
